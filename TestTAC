@@ -1,0 +1,15 @@
+package nomePkg
+
+var z = 2
+var c[2][12] = 'c'
+var k int = 1
+
+
+func vector () {
+	z +  &z + 3
+	1 < k
+	z = 1
+	1
+	3 == 2
+	!false
+}

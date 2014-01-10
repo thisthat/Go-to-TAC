@@ -1,0 +1,74 @@
+Variabili
+	controllo unicità all'interno dello stesso env -> OK
+	Tipo di inizializzazione compatibile con quello dichiarato -> OK
+
+Funzioni
+	Controllo unicità all'interno dello stesso env --> Da grammatica blocchiamo l'highorder -> solo env globale ha funzioni
+	-> OK
+--STM--
+For
+	Seconda Rexp del for di tipo bool --> Ok
+	
+While
+	Rexp del while bool -> Ok
+
+If
+	Rexp bool -> OK
+	
+If Else
+	Rexp bool -> OK
+	
+Case
+	Valore del case compatibile con l'id -> Ok
+
+Return
+	Tipo compatibile con quello della funzione -> OK
+	No codice sotto al return [Warning] -> Pattern Matching su list stm, se return cons lista 1 elemento  -> OK
+	Se tipo funzione != void allora deve essere presente
+	Se return all'inteno dell'if anche fuori -> OK
+	Se return nell'if deve essere presente anche nell'else -> OK
+	Se return nell'if oppure(esclusivo) else deve essere presente anche fuori -> OK
+
+Continue
+	Deve essere dentro un ciclo
+
+Break
+	Deve essere dentro ad un ciclo
+
+--Exp--
+Assegnamento
+	Compatibilità dei tipi -> OK
+	No cost come LExp -> OK
+	
+Chiamata Funzione
+	Esistenza -> OK
+	Compatibilità nel numero di parametri -> OK
+	Compatibilità tipi dei parametri -> OK
+
+Math
+	Compatibilità di tipo e ammissibilità rexp -> OK
+
+Rel
+	Compatibilità tipo bool e ammissibilità rexp -> OK
+
+Bool
+	Bool le due exp e ammissibili -> OK
+
+UpOp
+	'-' -> Rexp di tipo Math -> OK
+	'!' -> Rexp di tipo Bool -> OK
+
+--Lexp--
+
+ID 
+	Identificatore esistente -> OK
+
+Puntatore
+	Che vi sia presente un id nella rexp -> *(2+3) non posso farlo -> *(2+3+id) si
+	-> OK
+Vettore
+	Identificatore sia realmente vettore -> OK
+	Dimensione compatibile con quanto dichiarato -> Ok
+
+
+

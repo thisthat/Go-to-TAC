@@ -1,0 +1,119 @@
+Program: PACKAGE IDENT END ImportList GVar Funz { Pr (PRI $2) $4 $5 $6 }
+   	
+ImportList 	: {-empty-}	{ [] }
+	    	| IMPORT STRINGA END ImportList   { (Imp $2): $4 }
+			| IMPORT OPENR OptEnd Imp  CLOSER END { $4 }
+
+Imp	: STRINGA END OptEnd		{ [(Imp $1 )] }
+	| Imp STRINGA END OptEnd	{ (Imp $2 ) : $1 }
+
+OptEnd: {-empty-}  { }
+      | OptEnd END { }
+
+GVar : {-empty-} 	{ [] }
+     | GVar VAR IDENT Tipo END			{ (Var $4 (Id $3) (Valore $4 "") ValMode) : $1 }
+     | GVar VAR IDENT DefTipo UGUALE Valori END		{ (Var (inferenzaTipo (Var $4 (Id $3) $6  ValMode )) (Id $3) $6  ValMode ) : $1 }
+     | GVar VAR OPENR OptEnd VarLine OptEnd CLOSER END 	{ $5 ++ $1 }
+
+VarLine : {-empty-} { [] }
+		| VarLine IDENT DefTipo UGUALE Valori END OptEnd  { (Var (inferenzaTipo (Var $3 (Id $2) $5  ValMode ) ) (Id $2) $5 ValMode) : $1 }
+		| VarLine IDENT Tipo END OptEnd	{ (Var $3 (Id $2) (Valore $3 "") ValMode) : $1 }
+
+DefTipo : {-empty-}	{ Void }
+		| Tipo		{ $1 }
+
+
+Valori 	: INTERO	{ Valore Integer $1 }
+		| FLOAT		{ Valore Flt32 $1 }
+		| BOOLEANO	{ Valore Boolean $1 }
+		| STRINGA	{ Valore Str $1 }
+		| CHAR		{ Valore Rune $1 }
+
+TipoOpz : {-empty-} {Void}
+		| Tipo		{ $1 }	
+
+Tipo : RUNE			{ Rune }
+	 | BOOL			{ Boolean }
+	 | STR			{ Str }
+	 | INT			{ Integer }
+	 | AST Tipo		{ Ptr $2 }
+	 | FLOAT32		{ Flt32 }
+	 | FLOAT64		{ Flt64 }
+	 | OPENQ INTERO CLOSEQ Tipo { Arr (read $2) $4 }
+
+
+Funz : {-empty-} { [] }
+     | Funz FUNC IDENT OPENR ParList CLOSER TipoOpz BloccoF RETURN OptRe END CLOSEG OptEnd { (SFunz (Id $3) $7 $5 $8 $10): $1 }
+ 
+
+OptRe : {-empty-} { (RVal (Valore Void "")) }
+	  | RE		  { $1 }
+
+ParList: {-empty-}     		{[]} 
+       | ParListNE     		{ $1 }
+
+ParListNE : IDENT Tipo Modo 				 {  (Par (Id $1) $2 $3) :[] }
+          | ParListNE COMMA IDENT Tipo Modo  { (Par (Id $3) $4 $5): $1 }
+          
+Modo : VALRES 	{ ValResMode }
+     | CNST		{ ConstMode }
+     | pvalore 	{ $1 }
+     
+pvalore : {-empty-} 	{ ValMode }
+        | VAL 			{ ValMode }
+        
+
+Blocco : OPENG END GVar Lstm OptEnd CLOSEG END { Block $3 $4 }
+BloccoF : OPENG END GVar Lstm OptEnd { Block $3 $4 }
+BloccoNE : OPENG END GVar Lstm OptEnd CLOSEG   { Block $3 $4 }
+BloccoSw : OPENG END Lcase CLOSEG END 		   { $3 }
+
+Lstm : {-empty-} { [] }
+     |  Stm Lstm { $1 : $2 }
+
+Stm : FOR RE SEMICOL RE SEMICOL RE Blocco { NFor $2 $4 $6 $7  }         
+	| FOR RE Blocco 	{ WFor $2 $3 }
+	| FOR Blocco		{ SBlock $2 }
+	| IF RE Blocco		{ SIf $2 $3 }
+	| IF RE BloccoNE ELSE Blocco { SIfElse $2 $3 $5 }
+    | SWITCH IDENT BloccoSw { SSw (Id $2) $3 }
+	| Blocco { SBlock $1 }
+	| TRY BloccoNE CATCH Blocco { STry $2 $4 }
+	| Rep OptEnd { SRE $1 }
+	
+
+Lcase : {-empty-} { [] }
+	  | OptEnd CASE Valori COL Lstm OptEnd Lcase { (SCase $3 $5) : $7 }
+	  | OptEnd DEFAULT COL Lstm OptEnd { [SCase (Valore Void "") $4]  }
+
+Rep: RE { $1 }
+
+
+RE  : RE PLUS RE	{ MathExp "+" $1 $3 }
+	| RE MINUS RE	{ MathExp "-" $1 $3 }
+	| RE OPEQ RE	{ BoolExp $2 $1 $3 }
+	| RE OPDISEQ RE	{ BoolExp $2 $1 $3 }
+	| RE OR RE		{ BoolExp "||" $1 $3 }
+	| RE AND RE		{ BoolExp "&&" $1 $3 }
+	| RE AST RE		{ MathExp "*" $1 $3 }
+	| RE DIV RE		{ MathExp "/" $1 $3 }
+	| RE POW RE			{ MathExp "^" $1 $3 }
+	| OPENR RE CLOSER	{ RE $2 }
+	| MINUS RE			{ UnOp "-" $2 }
+	| NOT RE			{ UnOp "!" $2 }
+	| LE				{ LRExp $1 }
+	| IDENT OPENR ListParAtt CLOSER 	{ FCall (Id  $1) $3  }
+	| DEPUNT IDENT		{ DPunt (Id $2) }
+	| Valori	{ RVal $1 }
+	| LE UGUALE RE	{ RAsseg $1 $3 }
+
+ListParAtt: {-empty-}     		{ [] } 
+       	  | ListParAttNE     	{ $1  }
+
+ListParAttNE : RE 				 	 { [(RE $1)] }
+          	 | ListParAttNE COMMA RE { (RE $3) : $1}
+
+
+LE 	: IDENT 					{ LID (Id $1) }
+	| AST IDENT					{ LPunt (Id $2) }
+	| IDENT OPENQ RE CLOSEQ		{ LVett (Id $1) $3 }

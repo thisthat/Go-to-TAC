@@ -1,0 +1,78 @@
+package nomePkg
+
+var z = 2
+var c[2][12] = 'c'
+var z = 'c'
+var k int = 12.0
+
+
+func vector () int {
+	var a = 23
+	var z = 2
+	var asd int = "ciao"
+	for z=0 ; z ; z = z+1 {
+		if z + 3 {
+		
+		}
+	}
+	if true {
+		
+	}
+	else  { 
+return 1
+	}
+	return 0
+}
+
+func cFun(x int valres, i int cnst) int {
+var b = true
+var exp int = 2
+var flt = 230.1
+
+*(2+1) = 23
+break
+
+exp = cFun( b,i)
+
+
+
+if b {
+	flt = (flt^exp)
+} else {
+	flt = ((flt^exp)*12)/exp
+}
+
+for i=0 ; i < x ; i = i+1 {
+				flt = flt +1
+continue
+break
+}
+
+continue
+
+
+*(1+3+4+i) = 2
+
+
+switch x {
+case 'c': i = 'c'
+	case 2: if carattere == '$' {
+	//Niente da fare qua
+} else {
+			z = carattere * 2	
+	}
+
+case "ste": exp +1
+default: if b {
+			flt = (flt^exp)
+		} else {
+			flt = ((flt^exp)*12)/exp
+		}
+}
+
+return (x+i^x)
+
+
+b[2][3] = 2
+
+}

@@ -1,0 +1,88 @@
+package nomePkg
+
+import "import1"
+
+//Bla Bla BLa
+import (
+	"import2"
+	"etcetc"
+)
+
+
+var (
+	puntatoreRune *rune
+	carattere rune = 'c'
+)
+
+//Inferisce da solo il tipo
+var z = 2
+var c = 'c'
+
+func testPar(x int, e int cnst) int {
+
+	return 2
+}
+
+func tFun (x int ,t int) int {
+	var z [4]int
+	var y  int
+	var k *int
+	y = &k
+z[3][22] = 3
+*k = 2
+
+	for 1 < k {
+
+		y = &k+12
+}        
+for {
+	//loop infinito
+}
+
+	return	cFun(y,t+4)
+
+}
+
+
+/*
+
+ yacc -> yet another comment commentato
+
+*/
+
+func cFun(x int valres, i rune) int {
+var b = true
+var exp int = 2
+var flt = 230.1
+
+if b {
+	flt = (flt^exp)
+} else {
+	flt = ((flt^exp)*12)/exp
+}
+
+for i=0 ; i < x ; i = i+1 {
+				flt = flt +1
+}
+
+
+switch x {
+case 0: i = 'c'
+	case 2: if carattere == '$' {
+	//Niente da fare qua
+} else {
+			z = carattere * 2	
+	}
+	
+default: if b {
+			flt = (flt^exp)
+		} else {
+			flt = ((flt^exp)*12)/exp
+		}
+}
+
+return (x+i^x)
+
+}
+
+

@@ -1,0 +1,12 @@
+Rimozione della regola optEnd dopo un token END, andrebbe sempre in epsilon perchè nel lexer abbiamo \n+ 
+Rimozione regola TipoOpz -> identica alla regola DefTipo
+OptEnd non può essere rifatta in coerenza con il \n+ perchè se ho: invio commento invio il parser legge due END
+Ricorsione Sx su regola Imp risolta in modo canonico
+Ricorsione Sx su regola Gvar
+Ricorsione Sx su regola VarLine
+Regola DefTipo inutile, portata tutta la produzione in regola Tipo
+Rimosse le precedenze per PRE e POST
+Rimossa la regola pvalore, anticipata la produzione
+Rimosso il return nella funzione -> diventa parte degli statement
+regola STM -> RE OptEnd riscritta come STM -> RE END
+aggiunte precedenze operatori unari e return
