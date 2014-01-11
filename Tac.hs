@@ -3,7 +3,40 @@ import GeneralAbs
 import Dati
 --RIMUOVERE PRIMA DELLA CONSEGNA
 import Debug.Trace
-{-
+
+data TACProgram = Program String [Function]
+data Function = Function String [Instruction]
+data Value = Constant String 		|
+             Temporary Int          |
+             Variable String 		|
+             Dereference Value
+  deriving (Eq)
+  {--
+             FloatConstant String   |
+             CharConstant String    |
+             StringConstant String  |
+             BoolConstant String   	|
+             --}
+
+data Label = Label String Int
+  deriving (Eq)
+
+data Instruction = BinaryOperator BinOp Value Value Value	|
+                   UnaryOperator UnOp Value Value           |
+                   Assignment Value Value                   |
+                   Goto Label                               |
+                   GotoIf Value Label                       |
+                   GotoIfFalse Value Label                  |
+                   OnExceptionGoto Label                    | -- Come implemento?
+                   Param Value                              |
+                   FuncCall String Int Value                |
+                   ProcCall String Int                      |
+                   FuncRet Value                            |
+                   ProcRet                                  |
+                   Throw                                    |
+                   LabelMarker Label
+  deriving (Eq)
+
 data BinOp = Sum | Sub | Mul | Div | Pow |
              And | Or | Xor | 
              Equ | NEqu | LT | GT | LTE | GTE
@@ -11,6 +44,12 @@ data BinOp = Sum | Sub | Mul | Div | Pow |
 
 data UnOp = Minus | Not
  			deriving (Eq)
+
+data NextIfPos = Elsif | Else | EndIf
+ deriving (Eq)
+
+ -- Liste "funzional level" per la concatenazione efficiente delle espressioni
+type FList a = [a] -> [a]
 
 unknown = traceStack "" undefined
 
@@ -47,96 +86,103 @@ unaryExprOp (GeneralAbs.UnOp op _ _)
 	| otherwise = unknown
 
 unaryExprOp _ = unknown
--}
 
-{-}
-createTac (Pr _ _ lvar lfun) = (createTacFunList lfun) 
-createTacFunList [] = ""
-createTacFunList (f:fs) = showString (createTacFun f) (createTacFunList fs) 
-createTacFun (GeneralAbs.SFunz (GeneralAbs.Id name) _ _ lstm _ ) = showString name "\n"
-{ -}
-createTac :: Program -> String
-createTac (Pr _ _ lvar lfun) = createTacFunList lfun 
+instance Show TACProgram where
+	show (Program name fs) = showString "PROGRAM " . showString name . showString "\n" . (showF fs) $ "\n" 
+		where 
+			showF [] = id
+			showF (f:fs) =  showString (show f) . showString "\n" . showF fs	
 
-createTacFunList [] = ""
-createTacFunList (f:fs) = showString (createTacFun f) (createTacFunList fs) 
+instance Show Function where
+	showsPrec _ (Function name lstm) = showString "function: " . showString name . showString "\n" . foldr aux id lstm
+		where
+			aux x l = shows x . showString "\n" . l
 
-createTacFun (SFunz (Id name) _ _ lstm _ ) = createTacStmList lstm 0
+instance  Show Instruction where
+	showsPrec _ _ = showString "istruzione" 
 
-createTacStmList [] _ = ""
-createTacStmList (s:ss) c =  showString tacList (createTacStmList ss counter)
-	where 
-		(tacList,counter) = createTacStm s c
 
-createTacStm (SRExp r _) counter = (tac,cc)
+createTac :: Program -> TACProgram
+createTac (Pr name _ lvar lfun) = (Program name (createTacFunList lfun))
+
+createTacFunList :: [SFunz] -> [Function]
+createTacFunList [] = []
+createTacFunList ((SFunz (Id name) _ _ lstm _ ):fs) = (Function name ls ) : createTacFunList fs
 	where
-		(cc,_,tac) = createTacRexp r counter
-createTacStm _ _ = ("",0)
+		ls = (createTacStmList lstm 0) []
+
+createTacStmList :: [Stm] -> Int -> FList Instruction
+createTacStmList [] _ = id
+createTacStmList (s:ss) c =  stm .  (createTacStmList ss counter)
+	where 
+		(stm,counter) = createTacStm s c
+
+
+createTacStm (SRExp r _) counter = (instr,cc)
+	where
+		(cc,_,instr) = createTacRexp r counter
+createTacStm _ _ = ((UnaryOperator Not (Constant "0") (Constant "0") :) ,0)
 
 --Ultimo registro usato
 --Address della espressione
---TAC espressione
-createTacRexp :: RExp -> Int -> (Int,String,String)
+--Costrutto espressione
+createTacRexp :: RExp -> Int -> (Int,Value,FList Instruction)
 
 createTacRexp (RVal (Valore t str)) counter = (addr, dest, tac)
 	where 
 		addr = counter + 1
-		dest = showString "t" $ show addr
-		tac =  showString dest . showString " = " . showString str $ "\n"
+		dest = Temporary addr
+		tac =  (Assignment dest (Constant str) :)
 
 createTacRexp (LRExp left) counter = createTacLexp left counter
 
-createTacRexp (DPunt left) counter = (t, tac, "")
+createTacRexp (DPunt left) counter = (t, dest ,tacL . tac)
 	where
 		(t,addr,tacL) = createTacLexp left counter
-		tac = '&' : addr
+		addr' = t + 1
+		dest = Temporary addr'
+		tac = (Assignment dest (Dereference addr) :)
 
-createTacRexp (Assg left right _) counter = (nRegR, addrL, tac)
+createTacRexp (Assg left right _) counter = (nRegR, addrL, tacL . tacR . tac)
 	where
 		(nRegL,addrL,tacL) = createTacLexp left counter
 		(nRegR,addrR,tacR) = createTacRexp right nRegL
-		tac = showString tacL . showString tacR . showString addrL . showString " = " . showString addrR $ "\n"
+		tac = (Assignment addrL addrR :)
 
 createTacRexp (RE rexp) counter = createTacRexp rexp counter
 
-createTacRexp (MathExp op rl rr _ ) counter = (addr, dest , tac)
+createTacRexp rop@(MathExp op rl rr _ ) counter = (addr, dest , tacRl . tacRr . tac)
 	where
 		(nRegL,addrL,tacRl) = createTacRexp rl counter
 		(nRegR,addrR,tacRr) = createTacRexp rr nRegL
 		addr = (nRegR + 1)
-		dest = showString "t" $ show addr
-		tac = showString tacRl . showString tacRr . showString dest . showString " = " . showString addrL . showString " " . showString op . showString " " . showString addrR $ "\n"
+		dest = Temporary addr
+		tac = (BinaryOperator (binaryExprOp rop)  dest addrL addrR :)
 
-createTacRexp (BoolExp op r1 r2 _ ) counter = (addr, dest , tac)
+createTacRexp rop@(BoolExp op r1 r2 _ ) counter = (addr, dest ,tac1 . tac2 . tac)
 	where
 		(nReg1,addr1,tac1) = createTacRexp r1 counter
 		(nReg2,addr2,tac2) = createTacRexp r2 nReg1
 		addr = (nReg2 + 1)
-		dest = showString "t" $ show addr
-		tac = showString tac1 . showString tac2 $ "NOT IMPLEMENTED YET BOOLEXP\n"
+		dest = Temporary addr
+		tac = (BinaryOperator (binaryExprOp rop)  dest addr1 addr2 :)
 
-createTacRexp (RelExp op r1 r2 _ ) counter = (addr, dest , tac)
+createTacRexp rop@(RelExp op r1 r2 _ ) counter = (addr, dest , tac1 . tac2 . tac )
 	where
 		(nReg1,addr1,tac1) = createTacRexp r1 counter
 		(nReg2,addr2,tac2) = createTacRexp r2 nReg1
 		addr = (nReg2 + 1)
-		dest = showString "t" $ show addr
-		tac = showString tac1 . showString tac2 $ "NOT IMPLEMENTED YET RELEXP\n"
+		dest = Temporary addr
+		tac = (BinaryOperator (binaryExprOp rop)  dest addr1 addr2 :)
 
-createTacRexp (UnOp op r _ ) counter = (addr, dest, tac)
+createTacRexp rop@(UnOp op r _ ) counter = (addr, dest, tac1 . tac )
 	where
 		(nReg1,addr1,tac1) = createTacRexp r counter
 		addr = (nReg1 + 1)
-		dest = showString "t" $ show addr
-		tac =  showString tac1 . showString dest . showString " = " . showString op . showString addr1 $ "\n" 
+		dest = Temporary addr
+		tac = (UnaryOperator (unaryExprOp rop)  dest addr1 :)
 
-createTacRexp (FCall (Id name) lre _) counter = (addr, tac, tac)
-	where
-		(lastR,listAddr,tacReg) = composeTac lre counter
-		addr = lastR + 1
-		n = show (length lre)
-		tac = showString tacReg . showString "call " . showString name . showString "/" .  showString n $ "\n" 
-		composeTac _ _ = (0,[],"")
+createTacRexp (FCall (Id name) lre _) counter = (counter, Temporary counter , (UnaryOperator Not (Constant "0") (Constant "0") :) )
 
-createTacLexp (LID (Id i)) counter = (counter, i, "")
+createTacLexp (LID (Id i)) counter = (counter, Temporary counter, ((UnaryOperator Not (Constant "0") (Constant "0")):) )
  

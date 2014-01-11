@@ -7,7 +7,7 @@ import Lexer
 import GeneralAbs
 import Function
 import PrettyPrint
-import Tac
+import qualified Tac
 --Se si vuole avere output colorato decommentare le seguenti righe
 --NECESSARIO AVERE IL PACKAGE System.Console.ANSI
 --Installabile con cabal install ansi-terminal
@@ -1306,7 +1306,7 @@ main = do
 		writeFile "prettyPrintedFile.txt" (prettyPrint pParsed)
 		putStrLn $ show pParsed
 		putStrLn "--INIZIO STAMPA TAC--"
-		putStr $ createTac pParsed
+		putStr $ show $ Tac.createTac pParsed
 		putStrLn "--FINE TAC--"
 	else (writeList errList)
 	where
