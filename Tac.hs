@@ -94,13 +94,55 @@ instance Show TACProgram where
 			showF (f:fs) =  showString (show f) . showString "\n" . showF fs	
 
 instance Show Function where
-	showsPrec _ (Function name lstm) = showString "function: " . showString name . showString "\n" . foldr aux id lstm
+	showsPrec _ (Function name lstm) = showString "\nfunction: " . showString name . showString "\n" . foldr aux id lstm
 		where
 			aux x l = shows x . showString "\n" . l
 
 instance  Show Instruction where
-	showsPrec _ _ = showString "istruzione" 
+	showsPrec _ (BinaryOperator op result v1 v2) = showString "\t" . (shows result) . showString " = " . (shows v1) . (shows op) . (shows v2)
+	showsPrec _ (UnaryOperator op result value) = showString "\t" . shows result . showString " = " . shows op . shows value
+	showsPrec _ (Assignment result value) = showString "\t" . shows result . showString " = " . shows value
+	showsPrec _ (Goto label) = showString "\tgoto " . shows label
+	showsPrec _ (GotoIf value label) = showString "\tif " . shows value . showString " goto " . shows label
+	showsPrec _ (GotoIfFalse value label) = showString "\tif not " . shows value . showString " goto " . shows label
+	showsPrec _ (OnExceptionGoto label) = showString "\ton exception goto " . shows label
+	showsPrec _ (Throw) = showString "\tthrow"
+	showsPrec _ (Param value) = showString "\tparam " . shows value
+	showsPrec _ (ProcCall name n) = showString "\tcall " . showString name . showString " " . shows n
+	showsPrec _ (FuncCall name n v) = showString "\t" . shows v . showString " = call " . showString name . showString "/" . shows n
+	showsPrec _ (ProcRet ) = showString "\tret"
+	showsPrec _ (FuncRet v) = showString "\tretf " . shows v
+	showsPrec _ (LabelMarker label) = shows label . showString ":"
 
+
+instance Show Value where
+	show (Constant s)  	=  s		
+	show (Temporary s) 	=  't':(show s)       
+	show (Variable s)  	=  s
+	show (Dereference s) =  '&':(show s)
+
+instance Show BinOp where
+	show Tac.Sum = "+"
+	show Tac.Sub = "-"
+	show Tac.Mul = "*"
+	show Tac.Div = "/"
+	show Tac.Pow = "^"
+	show Tac.And = "and"
+	show Tac.Or  = "or"
+	show Tac.Xor = "xor"
+	show Tac.Equ = "=="
+	show Tac.NEqu = "!="
+	show Tac.LT  = "<"
+	show Tac.LTE = "<="
+	show Tac.GT  = ">"
+	show Tac.GTE = ">="
+
+instance Show UnOp where
+	show Tac.Minus = "-"
+	show Tac.Not = "!" 
+
+instance Show Label where
+   showsPrec _ (Label name c) = showString name . showString "." . (shows c)
 
 createTac :: Program -> TACProgram
 createTac (Pr name _ lvar lfun) = (Program name (createTacFunList lfun))
@@ -182,7 +224,48 @@ createTacRexp rop@(UnOp op r _ ) counter = (addr, dest, tac1 . tac )
 		dest = Temporary addr
 		tac = (UnaryOperator (unaryExprOp rop)  dest addr1 :)
 
-createTacRexp (FCall (Id name) lre _) counter = (counter, Temporary counter , (UnaryOperator Not (Constant "0") (Constant "0") :) )
+createTacRexp (FCall (Id name) param _) counter = (addr, dest , tac )
+	where
+		(c,lAddrPar,tacGenParam) = createTacParam counter param
+		addr = (c + 1)
+		dest = Temporary addr
+		tac  = tacGenParam . (pars lAddrPar) . (FuncCall name (length lAddrPar) dest :) 
+		pars [] = id
+		pars (p:ps) = (Param p:).(pars ps)
 
-createTacLexp (LID (Id i)) counter = (counter, Temporary counter, ((UnaryOperator Not (Constant "0") (Constant "0")):) )
+		                
+
+createTacLexp (LID (Id i)) counter = (counter, Temporary counter, ((UnaryOperator Not (Constant "L") (Constant "0")):) )
+
+
+createTacParam :: Int -> [RExp] -> (Int,[Value], FList Instruction)
+createTacParam c [] = (c,[],id)
+createTacParam c (p:ps) = (c',lPar, tac)
+	where
+		(counter,destRexp,tacRexp) = createTacRexp p c
+		(c',lPar',tac') = createTacParam counter ps
+		lPar = destRexp:lPar'
+		tac = tacRexp . tac'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
  
