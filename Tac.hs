@@ -122,20 +122,20 @@ instance Show Value where
 	show (Dereference s) =  '&':(show s)
 
 instance Show BinOp where
-	show Tac.Sum = "+"
-	show Tac.Sub = "-"
-	show Tac.Mul = "*"
-	show Tac.Div = "/"
-	show Tac.Pow = "^"
-	show Tac.And = "and"
-	show Tac.Or  = "or"
-	show Tac.Xor = "xor"
-	show Tac.Equ = "=="
-	show Tac.NEqu = "!="
-	show Tac.LT  = "<"
-	show Tac.LTE = "<="
-	show Tac.GT  = ">"
-	show Tac.GTE = ">="
+	show Tac.Sum = " + "
+	show Tac.Sub = " - "
+	show Tac.Mul = " * "
+	show Tac.Div = " / "
+	show Tac.Pow = " ^ "
+	show Tac.And = " and "
+	show Tac.Or  = " or "  
+	show Tac.Xor = " xor "
+	show Tac.Equ = " == "
+	show Tac.NEqu = " != "
+	show Tac.LT  = " < "
+	show Tac.LTE = " <= "
+	show Tac.GT  = " > "
+	show Tac.GTE = " >= "
 
 instance Show UnOp where
 	show Tac.Minus = "-"
@@ -151,82 +151,89 @@ createTacFunList :: [SFunz] -> [Function]
 createTacFunList [] = []
 createTacFunList ((SFunz (Id name) _ _ lstm _ ):fs) = (Function name ls ) : createTacFunList fs
 	where
-		ls = (createTacStmList lstm 0) []
+		ls = (createTacStmList lstm 0 0) []
 
-createTacStmList :: [Stm] -> Int -> FList Instruction
-createTacStmList [] _ = id
-createTacStmList (s:ss) c =  stm .  (createTacStmList ss counter)
+createTacStmList :: [Stm] -> Int -> Int -> FList Instruction
+createTacStmList [] _ _ = id
+createTacStmList (s:ss) c l =  stm .  (createTacStmList ss counter label)
 	where 
-		(stm,counter) = createTacStm s c
+		(stm,counter,label) = createTacStm s c l
 
 
-createTacStm (SRExp r _) counter = (instr,cc)
+createTacStm (SRExp r _) counter label = (instr,cc,ll)
 	where
-		(cc,_,instr) = createTacRexp r counter
-createTacStm _ _ = ((UnaryOperator Not (Constant "0") (Constant "0") :) ,0)
+		(cc,ll,_,instr) = createTacRexp r counter label
+createTacStm _ _ _ = ((UnaryOperator Not (Constant "0") (Constant "0") :) ,0,0)
 
+--IN
+--	Exp, n° registro, n° label
+--OUT
 --Ultimo registro usato
+--Ultima label usata
 --Address della espressione
 --Costrutto espressione
-createTacRexp :: RExp -> Int -> (Int,Value,FList Instruction)
+createTacRexp :: RExp -> Int -> Int -> (Int,Int,Value,FList Instruction)
 
-createTacRexp (RVal (Valore t str)) counter = (addr, dest, tac)
+createTacRexp (RVal (Valore t str)) counter l = (addr,l, dest, tac)
 	where 
 		addr = counter + 1
 		dest = Temporary addr
 		tac =  (Assignment dest (Constant str) :)
 
-createTacRexp (LRExp left) counter = createTacLexp left counter
+createTacRexp (LRExp left) counter label = createTacLexp left counter label
 
-createTacRexp (DPunt left) counter = (t, dest ,tacL . tac)
+createTacRexp (DPunt left) counter label = (t, l, dest ,tacL . tac)
 	where
-		(t,addr,tacL) = createTacLexp left counter
+		(t,l,addr,tacL) = createTacLexp left counter label
 		addr' = t + 1
 		dest = Temporary addr'
 		tac = (Assignment dest (Dereference addr) :)
 
-createTacRexp (Assg left right _) counter = (nRegR, addrL, tacL . tacR . tac)
+createTacRexp (Assg left right _) counter label = (nRegR,l, addrL, tacL . tacR . tac)
 	where
-		(nRegL,addrL,tacL) = createTacLexp left counter
-		(nRegR,addrR,tacR) = createTacRexp right nRegL
+		(nRegL,label',addrL,tacL) = createTacLexp left counter label
+		(nRegR,l,addrR,tacR) = createTacRexp right nRegL label'
 		tac = (Assignment addrL addrR :)
 
-createTacRexp (RE rexp) counter = createTacRexp rexp counter
+createTacRexp (RE rexp) counter label = createTacRexp rexp counter label
 
-createTacRexp rop@(MathExp op rl rr _ ) counter = (addr, dest , tacRl . tacRr . tac)
+createTacRexp rop@(MathExp op rl rr _ ) counter label = (addr, l, dest , tacRl . tacRr . tac)
 	where
-		(nRegL,addrL,tacRl) = createTacRexp rl counter
-		(nRegR,addrR,tacRr) = createTacRexp rr nRegL
+		(nRegL,label',addrL,tacRl) = createTacRexp rl counter label
+		(nRegR,l,addrR,tacRr) = createTacRexp rr nRegL label'
 		addr = (nRegR + 1)
 		dest = Temporary addr
 		tac = (BinaryOperator (binaryExprOp rop)  dest addrL addrR :)
 
-createTacRexp rop@(BoolExp op r1 r2 _ ) counter = (addr, dest ,tac1 . tac2 . tac)
+--Casi speciali per LE short-cut
+createTacRexp rop@(BoolExp "and" r1 r2 _ ) counter label = genExpAnd r1 r2 counter label
+createTacRexp rop@(BoolExp "or"  r1 r2 _ ) counter label = genExpOr  r1 r2 counter label
+createTacRexp rop@(BoolExp op r1 r2 _ ) counter label = (addr, l, dest ,tac1 . tac2 . tac)
 	where
-		(nReg1,addr1,tac1) = createTacRexp r1 counter
-		(nReg2,addr2,tac2) = createTacRexp r2 nReg1
+		(nReg1,label',addr1,tac1) = createTacRexp r1 counter label
+		(nReg2,l,addr2,tac2) = createTacRexp r2 nReg1 label'	
 		addr = (nReg2 + 1)
 		dest = Temporary addr
 		tac = (BinaryOperator (binaryExprOp rop)  dest addr1 addr2 :)
 
-createTacRexp rop@(RelExp op r1 r2 _ ) counter = (addr, dest , tac1 . tac2 . tac )
+createTacRexp rop@(RelExp op r1 r2 _ ) counter label = (addr, l, dest , tac1 . tac2 . tac )
 	where
-		(nReg1,addr1,tac1) = createTacRexp r1 counter
-		(nReg2,addr2,tac2) = createTacRexp r2 nReg1
+		(nReg1,label',addr1,tac1) = createTacRexp r1 counter label
+		(nReg2,l,addr2,tac2) = createTacRexp r2 nReg1 label'
 		addr = (nReg2 + 1)
 		dest = Temporary addr
 		tac = (BinaryOperator (binaryExprOp rop)  dest addr1 addr2 :)
 
-createTacRexp rop@(UnOp op r _ ) counter = (addr, dest, tac1 . tac )
+createTacRexp rop@(UnOp op r _ ) counter label = (addr,l, dest, tac1 . tac )
 	where
-		(nReg1,addr1,tac1) = createTacRexp r counter
+		(nReg1,l,addr1,tac1) = createTacRexp r counter label
 		addr = (nReg1 + 1)
 		dest = Temporary addr
 		tac = (UnaryOperator (unaryExprOp rop)  dest addr1 :)
 
-createTacRexp (FCall (Id name) param _) counter = (addr, dest , tac )
+createTacRexp (FCall (Id name) param _) counter label = (addr, l, dest , tac )
 	where
-		(c,lAddrPar,tacGenParam) = createTacParam counter param
+		(c,l, lAddrPar,tacGenParam) = createTacParam counter label param 
 		addr = (c + 1)
 		dest = Temporary addr
 		tac  = tacGenParam . (pars lAddrPar) . (FuncCall name (length lAddrPar) dest :) 
@@ -235,21 +242,35 @@ createTacRexp (FCall (Id name) param _) counter = (addr, dest , tac )
 
 		                
 
-createTacLexp (LID (Id i)) counter = (counter, Temporary counter, ((UnaryOperator Not (Constant "L") (Constant "0")):) )
+createTacLexp (LID (Id i)) counter label = (counter,label, Temporary counter, ((UnaryOperator Not (Constant "L") (Constant "0")):) )
 
 
-createTacParam :: Int -> [RExp] -> (Int,[Value], FList Instruction)
-createTacParam c [] = (c,[],id)
-createTacParam c (p:ps) = (c',lPar, tac)
+createTacParam :: Int -> Int -> [RExp] -> (Int,Int,[Value], FList Instruction)
+createTacParam c l [] = (c,l,[],id)
+createTacParam c l (p:ps) = (c',l',lPar, tac)
 	where
-		(counter,destRexp,tacRexp) = createTacRexp p c
-		(c',lPar',tac') = createTacParam counter ps
+		(counter,label, destRexp,tacRexp) = createTacRexp p c l
+		(c',l', lPar',tac') = createTacParam counter label ps 
 		lPar = destRexp:lPar'
 		tac = tacRexp . tac'
 
+genExpAnd :: RExp -> RExp -> Int -> Int -> (Int, Int,Value, FList Instruction)
+genExpAnd r1 r2 counter label = (0,0,(Constant "AND"),id)
 
+genExpOr r1 r2 counter label = (0,0,(Constant "0"),id)
 
-
+{-}
+genConjunctionExpr :: AST.Expr -> Maybe Value -> Environment -> Int -> Int -> (Value, FList Instruction, Int, Int)
+genConjunctionExpr (AST.And left right _ _) target env m count = (target', insts, m', count'')
+       where (target', m') = allocTemporary target rightm
+             (leftv, leftinst, leftm, count') = genExpr left (Just target') env m count
+             (rightv, rightinst, rightm, count'') = genExpr right (Just target') env leftm (count' + 1)
+             insts = leftinst .
+                     (GotoIfFalse target' endLabel:) .
+                     rightinst . 
+                     (LabelMarker endLabel:)
+             endLabel = Label "and.exit" (count'' + 1)
+-}
 
 
 
